@@ -1,6 +1,6 @@
 'use client';
 import { useState, type FormEvent } from 'react';
-import { ArrowRight, Sprout, Eye, EyeOff, ShieldCheck, Flame, Users, Sparkles } from 'lucide-react';
+import { ArrowRight, Eye, EyeOff, ShieldCheck, Flame, Users, Sparkles, CheckCircle2 } from 'lucide-react';
 
 export default function Login() {
   const [signup, setSignup] = useState(false);
@@ -24,9 +24,7 @@ export default function Login() {
       if (!r.ok) throw new Error(result.error);
 
       if (!result.confirmed) {
-        setMessage(
-          'Your account has been created! Please check your email to confirm, then sign in.'
-        );
+        setMessage('Account created! Please check your email to confirm, then sign in.');
         return;
       }
 
@@ -46,10 +44,11 @@ export default function Login() {
 
   return (
     <main className="auth-page">
+      {/* BRAND HEADER */}
       <div className="auth-brand-wrap">
-        <a className="brand" href="/">
+        <a className="brand" href="/" aria-label="Team Up Home">
           <div className="brand-icon-wrap">
-            <svg width="28" height="28" viewBox="0 0 36 38" fill="none" aria-hidden="true">
+            <svg width="26" height="26" viewBox="0 0 36 38" fill="none" aria-hidden="true">
               <circle cx="18" cy="19" r="16" stroke="currentColor" strokeWidth="2.5" opacity="0.2" />
               <path
                 d="M4 29V16a9 9 0 0 1 18 0v13M15 29V12a9 9 0 0 1 18 0v17"
@@ -67,34 +66,73 @@ export default function Login() {
         </a>
       </div>
 
+      {/* AUTH CARD */}
       <section className="auth-card">
-        <span className="eyebrow">
-          <Flame size={14} /> ATOMIC ACCOUNTABILITY
-        </span>
-        <h1>{signup ? 'Start your circle.' : 'Welcome back.'}</h1>
-        <p>
-          {signup
-            ? 'Create an account to invite your teammates, track habits, and keep each other accountable every single day.'
-            : 'Sign in to access your squad, review teammates’ daily streaks, and log your habits.'}
-        </p>
+        {/* TOP SEGMENTED TOGGLE */}
+        <div className="auth-tab-switch">
+          <button
+            type="button"
+            className={`auth-tab-btn ${!signup ? 'active' : ''}`}
+            onClick={() => {
+              setSignup(false);
+              setMessage('');
+            }}
+          >
+            Sign In
+          </button>
+          <button
+            type="button"
+            className={`auth-tab-btn ${signup ? 'active' : ''}`}
+            onClick={() => {
+              setSignup(true);
+              setMessage('');
+            }}
+          >
+            Create Account
+          </button>
+        </div>
 
-        <form onSubmit={submit}>
-          <label>
-            Email address
-            <input
-              name="email"
-              type="email"
-              autoComplete="email"
-              required
-              maxLength={254}
-              placeholder="you@domain.com"
-            />
-          </label>
+        <div className="auth-header">
+          <span className="eyebrow">
+            <Flame size={14} /> ATOMIC ACCOUNTABILITY
+          </span>
+          <h1>{signup ? 'Start your circle.' : 'Welcome back.'}</h1>
+          <p>
+            {signup
+              ? 'Create your free account to track daily habits and keep teammates accountable.'
+              : 'Sign in to sync your habits, check in today, and cheer on your squad.'}
+          </p>
+        </div>
 
-          <label>
-            Password
-            <div className="password-field">
+        {/* AUTH FORM */}
+        <form className="auth-form" onSubmit={submit}>
+          <div className="form-field">
+            <label htmlFor="email" className="field-label">
+              Email address
+            </label>
+            <div className="input-wrap">
               <input
+                id="email"
+                name="email"
+                type="email"
+                autoComplete="email"
+                required
+                maxLength={254}
+                placeholder="you@domain.com"
+                className="text-input"
+              />
+            </div>
+          </div>
+
+          <div className="form-field">
+            <div className="field-label-row">
+              <label htmlFor="password" className="field-label">
+                Password
+              </label>
+            </div>
+            <div className="input-wrap password-wrap">
+              <input
+                id="password"
                 name="password"
                 type={show ? 'text' : 'password'}
                 autoComplete={signup ? 'new-password' : 'current-password'}
@@ -102,62 +140,84 @@ export default function Login() {
                 maxLength={128}
                 required
                 placeholder="At least 8 characters"
+                className="text-input password-input"
               />
               <button
                 type="button"
+                className="toggle-password-btn"
                 aria-label={show ? 'Hide password' : 'Show password'}
                 onClick={() => setShow(!show)}
               >
                 {show ? <EyeOff size={18} /> : <Eye size={18} />}
               </button>
             </div>
-          </label>
-
-          {signup && (
-            <small className="auth-tip">
-              <ShieldCheck size={14} /> Use 8+ characters. Your data is encrypted and synced with
-              Supabase.
-            </small>
-          )}
+            {signup && (
+              <span className="field-hint">
+                <ShieldCheck size={13} /> Minimum 8 characters. End-to-end encrypted with Supabase.
+              </span>
+            )}
+          </div>
 
           {message && (
-            <div role="status" className="dialog-status">
+            <div role="status" className="dialog-status auth-alert">
               {message}
             </div>
           )}
 
-          <button className="button dark full" disabled={busy}>
-            {busy ? 'Connecting…' : signup ? 'Create Account & Join Squad' : 'Sign In'}
+          <button className="button dark full auth-submit-btn" disabled={busy}>
+            {busy ? 'Processing…' : signup ? 'Create Account & Join Squad' : 'Sign In'}
             <ArrowRight size={18} />
           </button>
         </form>
 
-        <button
-          className="auth-switch"
-          onClick={() => {
-            setSignup(!signup);
-            setMessage('');
-          }}
-        >
-          {signup ? 'Already have an account? Sign in' : 'New to Team Up? Create your account'}
-        </button>
+        {/* BOTTOM LINKS */}
+        <div className="auth-links">
+          <button
+            type="button"
+            className="auth-switch-link"
+            onClick={() => {
+              setSignup(!signup);
+              setMessage('');
+            }}
+          >
+            {signup ? 'Already have an account? Sign in' : 'New to Team Up? Create your account'}
+          </button>
 
-        <a className="auth-demo" href="/">
-          ← Back to interactive demo
-        </a>
+          <a className="auth-demo-link" href="/">
+            ← Explore interactive demo
+          </a>
+        </div>
 
-        <div className="auth-value-props">
-          <div>
-            <Users size={16} /> <strong>Teammate Accountability</strong>: See friends’ daily habits and
-            nudge them if pending.
+        {/* VALUE PROPS STRIP */}
+        <div className="auth-features">
+          <div className="feature-item">
+            <div className="feature-icon sage">
+              <Users size={16} />
+            </div>
+            <div className="feature-text">
+              <strong>Teammate Live Tracking</strong>
+              <span>See friends’ daily progress & send real-time nudges.</span>
+            </div>
           </div>
-          <div>
-            <Flame size={16} /> <strong>Atomic Streaks</strong>: Track individual & squad streaks with
-            James Clear principles.
+
+          <div className="feature-item">
+            <div className="feature-icon peach">
+              <Flame size={16} />
+            </div>
+            <div className="feature-text">
+              <strong>Atomic Streaks</strong>
+              <span>Never miss twice. Built on James Clear’s behavior laws.</span>
+            </div>
           </div>
-          <div>
-            <Sparkles size={16} /> <strong>Zero Guilt</strong>: Focus on 1% better every day, never
-            missing twice.
+
+          <div className="feature-item">
+            <div className="feature-icon lavender">
+              <Sparkles size={16} />
+            </div>
+            <div className="feature-text">
+              <strong>1% Better Together</strong>
+              <span>Quiet accountability without toxic competition.</span>
+            </div>
           </div>
         </div>
       </section>
