@@ -21,37 +21,31 @@ import {
   Settings2,
   Heart,
   X,
-  MoreHorizontal,
   Sun,
   Moon,
-  Coffee,
-  Send,
   Copy,
-  Link as LinkIcon,
   Play,
   Pause,
   RotateCcw,
   Trophy,
   Target,
-  CircleHelp,
-  Leaf,
   LogOut,
   Zap,
   MessageCircle,
   Share2,
-  Smile,
   ShieldCheck,
   CheckCircle2,
   Clock,
   Layers,
+  UserPlus,
+  Compass,
 } from 'lucide-react';
 import {
-  demoState,
+  emptyState,
   dateKey,
   shiftDay,
   streak,
   longestStreak,
-  personOverallStreak,
   teamActiveStreak,
   ATOMIC_HABIT_TEMPLATES,
   type State,
@@ -107,23 +101,22 @@ const lessons = [
     title: 'Identity-Based Habits: Who You Are Becoming',
     tag: 'ATOMIC RULE #3 · MAKE IT ATTRACTIVE',
     body:
-      'True behavior change is identity change. You might start a habit because of motivation, but the only reason you stick with one is that it becomes part of your identity.\n\nThe goal is not to read a book, the goal is to become a reader.\nThe goal is not to run a marathon, the goal is to become a runner.\n\nEvery action you take is a vote for the type of person you wish to become. No single instance will transform your beliefs, but as the votes build up, the evidence of your new identity grows.',
+      'True behavior change is identity change. You might start a habit because of motivation, but the only reason you stick with one is that it becomes part of your identity.\n\nThe goal is not to read a book, the goal is to become a reader.\nThe goal is not to run a marathon, the goal is to become a runner.\n\nEvery action you take is a vote for the type of person you wish to become.',
   },
   {
     title: 'Never Miss Twice: The Golden Rule of Consistency',
     tag: 'ATOMIC RULE #4 · MAKE IT SATISFYING',
     body:
-      'Missing once is an accident. Missing twice is the start of a new habit.\n\nAnyone can have a bad day or an emergency. When successful people make a mistake or miss a workout, they rebound quickly. The breaking of the habit doesn’t matter if the reclaiming of it is fast.\n\nShow up on your bad days. Even if you only do 10 pushups or write 1 sentence, maintaining the rhythm is what prevents your momentum from resetting.',
+      'Missing once is an accident. Missing twice is the start of a new habit.\n\nAnyone can have a bad day or an emergency. When successful people make a mistake, they rebound quickly. The breaking of the habit doesn’t matter if the reclaiming of it is fast.\n\nShow up on your bad days. Even if you only do 10 pushups or write 1 sentence, maintaining the rhythm is what prevents your momentum from resetting.',
   },
 ];
 
-function Avatar({ person, small = false, glow = false }: { person: Person; small?: boolean; glow?: boolean }) {
+function Avatar({ person, small = false, glow = false }: { person?: Person | null; small?: boolean; glow?: boolean }) {
+  const name = person?.name || 'You';
+  const color = person?.color || 'peach';
   return (
-    <span
-      className={`avatar ${person.color} ${small ? 'small' : ''} ${glow ? 'avatar-glow' : ''}`}
-      aria-label={person.name}
-    >
-      {person.name.slice(0, 1)}
+    <span className={`avatar ${color} ${small ? 'small' : ''} ${glow ? 'avatar-glow' : ''}`} aria-label={name}>
+      {name.slice(0, 1).toUpperCase()}
     </span>
   );
 }
@@ -132,7 +125,7 @@ function Brand() {
   return (
     <div className="brand">
       <div className="brand-icon-wrap">
-        <svg width="28" height="28" viewBox="0 0 36 38" fill="none" aria-hidden="true">
+        <svg width="26" height="26" viewBox="0 0 36 38" fill="none" aria-hidden="true">
           <circle cx="18" cy="19" r="16" stroke="currentColor" strokeWidth="2.5" opacity="0.2" />
           <path
             d="M4 29V16a9 9 0 0 1 18 0v13M15 29V12a9 9 0 0 1 18 0v17"
@@ -152,15 +145,14 @@ function Brand() {
 }
 
 export default function TeamUp() {
-  const [data, setData] = useState<State>(() => demoState());
-  const [demo, setDemo] = useState(true);
-  const [account, setAccount] = useState<{ id: string; name: string } | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
+  const [account, setAccount] = useState<Person | null>(null);
+  const [data, setData] = useState<State>(() => emptyState());
   const [view, setView] = useState<View>('Today');
   const [subTab, setSubTab] = useState<SubTab>('my-habits');
   const [modal, setModal] = useState<Modal>(null);
   const [toast, setToast] = useState('');
   const [busy, setBusy] = useState(false);
-  const [loadError, setLoadError] = useState('');
   const [darkMode, setDarkMode] = useState(false);
 
   const [today, setToday] = useState(dateKey());
@@ -168,8 +160,6 @@ export default function TeamUp() {
   const [weekOffset, setWeekOffset] = useState(0);
   const [filter, setFilter] = useState('All');
   const [progressTab, setProgressTab] = useState('Overview');
-  const [libraryTab, setLibraryTab] = useState('Library');
-  const [saved, setSaved] = useState<number[]>([]);
   const [joinToken, setJoinToken] = useState('');
   const [inviteLink, setInviteLink] = useState('');
 
@@ -183,7 +173,6 @@ export default function TeamUp() {
 
   const dialog = useRef<HTMLDialogElement>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const mounted = useRef(false);
 
   function notify(message: string) {
     setToast(message);
@@ -194,45 +183,44 @@ export default function TeamUp() {
   async function refresh() {
     try {
       const r = await fetch('/api/team');
-      const value = (await r.json()) as State & { error?: string; user?: Person };
-      if (!r.ok) throw new Error(value.error);
-      if (value.user) {
-        setAccount(value.user);
+      const value = (await r.json()) as (State & { user?: Person; team?: { id: string; name: string } | null }) | { error?: string };
+      if (!r.ok) throw new Error((value as { error?: string }).error || 'Could not load circle.');
+
+      const stateVal = value as State & { user?: Person; team?: { id: string; name: string } | null };
+      if (stateVal.user) {
+        setAccount(stateVal.user);
+        if (stateVal.team) {
+          setData(stateVal);
+        } else {
+          setData(emptyState(stateVal.user));
+        }
+      } else {
+        setAccount(null);
+        setData(emptyState());
       }
-      if (value.team) {
-        setData(value);
-        setDemo(false);
-      }
-      setLoadError('');
-      return value;
-    } catch (e) {
-      // In demo mode or offline, keep working seamlessly
-      return null;
+    } catch {
+      setAccount(null);
+    } finally {
+      setAuthLoading(false);
     }
   }
 
   useEffect(() => {
-    mounted.current = true;
+    // Purge legacy demo mock data from browser storage
     try {
+      localStorage.removeItem('team-up-demo-v1');
+      localStorage.removeItem('team-up-state-v2');
       const localTheme = localStorage.getItem('team-up-theme');
       if (localTheme === 'dark') {
         setDarkMode(true);
         document.documentElement.classList.add('dark');
       }
-      const local = localStorage.getItem('team-up-state-v2');
-      if (local) {
-        const parsed = JSON.parse(local);
-        if (parsed.day === dateKey()) setData(parsed.data);
-      }
-      setSaved(JSON.parse(localStorage.getItem('team-up-saved-lessons') || '[]'));
     } catch {}
 
     const token = new URLSearchParams(location.search).get('invite');
     if (token) {
       setJoinToken(token);
       setModal({ kind: 'join' });
-    } else if (new URLSearchParams(location.search).has('start')) {
-      setModal({ kind: 'create' });
     }
 
     refresh();
@@ -248,12 +236,6 @@ export default function TeamUp() {
   }, []);
 
   useEffect(() => {
-    if (mounted.current && demo) {
-      localStorage.setItem('team-up-state-v2', JSON.stringify({ day: today, data }));
-    }
-  }, [data, demo, today]);
-
-  useEffect(() => {
     if (modal && !dialog.current?.open) dialog.current?.showModal();
     else if (!modal && dialog.current?.open) dialog.current?.close();
   }, [modal]);
@@ -266,7 +248,7 @@ export default function TeamUp() {
       if (remaining === 0) {
         setEndsAt(null);
         setSessions((s) => s + 1);
-        notify('⚡ Focus session complete! Small habits, compound results.');
+        notify('⚡ Focus session completed! Small habits compound.');
         if (autoLog && focusHabit) {
           const h = data.habits.find((h) => h.id === focusHabit);
           if (h && !data.checkins.some((c) => c.habitId === h.id && c.day === dateKey())) {
@@ -291,8 +273,7 @@ export default function TeamUp() {
   };
 
   const mine = data.habits.filter((h) => h.userId === data.user.id);
-  const done = (h: Habit, day = selectedDay) =>
-    data.checkins.some((c) => c.habitId === h.id && c.day === day);
+  const done = (h: Habit, day = selectedDay) => data.checkins.some((c) => c.habitId === h.id && c.day === day);
   const completed = mine.filter((h) => done(h)).length;
   const todayDone = mine.filter((h) => done(h, today)).length;
 
@@ -312,7 +293,7 @@ export default function TeamUp() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     });
-    const value = (await response.json()) as { error?: string; token?: string };
+    const value = (await response.json()) as { error?: string; token?: string; ok?: boolean };
     if (!response.ok) throw new Error(value.error || 'Something went wrong. Please try again.');
     return value;
   }
@@ -326,28 +307,15 @@ export default function TeamUp() {
     const exists = done(h, today);
     setBusy(true);
     try {
-      if (demo) {
-        setData((d) => ({
-          ...d,
-          checkins: exists
-            ? d.checkins.filter((c) => !(c.habitId === h.id && c.day === today))
-            : [...d.checkins, { habitId: h.id, day: today, created: new Date().toISOString() }],
-        }));
-      } else {
-        await api({
-          action: 'toggle',
-          id: h.id,
-          day: today,
-          done: !exists,
-          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-        });
-        await refresh();
-      }
-      notify(
-        exists
-          ? 'Check-in undone.'
-          : `⚡ Repetition logged! 1% better every day.${demo ? ' (Saved locally)' : ''}`
-      );
+      await api({
+        action: 'toggle',
+        id: h.id,
+        day: today,
+        done: !exists,
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      });
+      await refresh();
+      notify(exists ? 'Check-in undone.' : '⚡ Habit logged! 1% better every day.');
     } catch (e) {
       notify((e as Error).message);
     } finally {
@@ -363,9 +331,8 @@ export default function TeamUp() {
   }
 
   async function openInvite() {
-    setInviteLink(`${location.origin}/?invite=${data.team.code || 'GROWTH-7X'}`);
+    setInviteLink('');
     setModal({ kind: 'invite' });
-    if (demo) return;
     setBusy(true);
     try {
       const result = await api({ action: 'invite' });
@@ -388,81 +355,30 @@ export default function TeamUp() {
 
     try {
       if (modal?.kind === 'habit') {
-        const newHabit: Habit = {
-          id: modal.habit?.id || 'h_' + Date.now(),
-          userId: data.user.id,
-          name: String(fields.name).trim(),
-          identity: String(fields.identity).trim(),
-          target: String(fields.target).trim(),
-          category: (fields.category as HabitCategory) || 'mind',
-          time: (fields.time as HabitTime) || 'Morning',
-          stackAfter: String(fields.stackAfter || '').trim(),
-          twoMinuteStarter: String(fields.twoMinuteStarter || '').trim(),
-          created: new Date().toISOString(),
-        };
-
-        if (demo) {
-          setData((d) => ({
-            ...d,
-            habits: modal.habit ? d.habits.map((x) => (x.id === newHabit.id ? newHabit : x)) : [...d.habits, newHabit],
-          }));
-        } else {
-          await api({
-            ...fields,
-            action: modal.habit ? 'edit_habit' : 'add_habit',
-            id: modal.habit?.id,
-          });
-          await refresh();
-        }
-        notify(modal.habit ? 'Habit refined. Consistency is king.' : '🌱 New atomic habit planted!');
+        await api({
+          ...fields,
+          action: modal.habit ? 'edit_habit' : 'add_habit',
+          id: modal.habit?.id,
+        });
+        await refresh();
+        notify(modal.habit ? 'Habit updated.' : '🌱 Atomic habit planted!');
       } else if (modal?.kind === 'create' || modal?.kind === 'join') {
-        if (demo && !account) {
-          // If in demo, allow immediate local switch or prompt sign-in
-          setData((d) => ({
-            ...d,
-            user: { ...d.user, name: String(fields.displayName) || 'You' },
-            team: {
-              id: 'local_' + Date.now(),
-              name: String(fields.name) || 'My Accountability Circle',
-              code: 'TEAM-' + Math.random().toString(36).substring(2, 6).toUpperCase(),
-            },
-          }));
-          notify('Welcome to your circle! Ready for your team.');
-        } else {
-          await api({
-            ...fields,
-            action: modal.kind === 'join' ? 'join_team' : 'create_team',
-            token: joinToken,
-          });
-          await refresh();
-          history.replaceState(null, '', location.pathname);
-          notify('Welcome to your circle! Let’s grow together.');
-        }
+        await api({
+          ...fields,
+          action: modal.kind === 'join' ? 'join_team' : 'create_team',
+          token: joinToken || String(fields.token || ''),
+        });
+        await refresh();
+        history.replaceState(null, '', location.pathname);
+        notify('Circle ready! Let’s build momentum together.');
       } else if (modal?.kind === 'nudge' || modal?.kind === 'encourage' || modal?.kind === 'reflect') {
         const msg = String(fields.message);
-        const newNote: Note = {
-          id: 'n_' + Date.now(),
-          userId: data.user.id,
-          recipient: modal.person?.id || null,
-          habitId: modal.habitId || null,
-          kind: modal.kind,
+        await api({
+          action: modal.kind === 'reflect' ? 'reflect' : 'encourage',
+          recipient: modal.person?.id,
           message: msg,
-          created: new Date().toISOString(),
-        };
-
-        if (demo) {
-          setData((d) => ({
-            ...d,
-            notes: [newNote, ...d.notes],
-          }));
-        } else {
-          await api({
-            action: modal.kind === 'reflect' ? 'reflect' : 'encourage',
-            recipient: modal.person?.id,
-            message: msg,
-          });
-          await refresh();
-        }
+        });
+        await refresh();
         notify(
           modal.kind === 'nudge'
             ? `⚡ Nudge sent to ${modal.person?.name}!`
@@ -482,16 +398,8 @@ export default function TeamUp() {
   async function deleteHabit(h: Habit) {
     setBusy(true);
     try {
-      if (demo) {
-        setData((d) => ({
-          ...d,
-          habits: d.habits.filter((x) => x.id !== h.id),
-          checkins: d.checkins.filter((c) => c.habitId !== h.id),
-        }));
-      } else {
-        await api({ action: 'delete_habit', id: h.id });
-        await refresh();
-      }
+      await api({ action: 'delete_habit', id: h.id });
+      await refresh();
       setModal(null);
       notify('Habit removed.');
     } catch (e) {
@@ -514,7 +422,7 @@ export default function TeamUp() {
     const reps = data.checkins.filter((c) => hs.some((h) => h.id === c.habitId)).length;
     const longest = Math.max(0, ...hs.map((h) => longestStreak(h.id, data.checkins)));
     return [
-      { name: 'First Little Step', icon: Sprout, desc: 'Logged first habit rep', yes: reps >= 1 },
+      { name: 'First Step', icon: Sprout, desc: 'Logged first habit rep', yes: reps >= 1 },
       { name: '7-Day Rhythm', icon: Flame, desc: 'Built a 7-day streak', yes: longest >= 7 },
       { name: 'Habit Stacker', icon: Layers, desc: 'Connected habits with clear cues', yes: reps >= 15 },
       { name: '21-Day Transformation', icon: Sparkles, desc: 'Formed a lasting neural pathway', yes: longest >= 21 },
@@ -524,6 +432,179 @@ export default function TeamUp() {
 
   const week = Array.from({ length: 7 }, (_, i) => shiftDay(today, -6 + i + weekOffset * 7));
 
+  // 1. LOADING SCREEN
+  if (authLoading) {
+    return (
+      <div className={`app-shell ${darkMode ? 'dark-theme' : ''}`}>
+        <main className="loading-screen">
+          <Brand />
+          <p className="loading-text">Connecting to your circle…</p>
+        </main>
+      </div>
+    );
+  }
+
+  // 2. UNLOGGED LANDING PAGE (NO FAKE USER DATA)
+  if (!account) {
+    return (
+      <div className={`landing-shell ${darkMode ? 'dark-theme' : ''}`}>
+        <header className="landing-topbar">
+          <Brand />
+          <div className="landing-nav-actions">
+            <button className="theme-icon-btn" onClick={toggleTheme} aria-label="Toggle theme">
+              {darkMode ? <Sun size={17} /> : <Moon size={17} />}
+            </button>
+            <a className="button light" href="/login">
+              Sign In
+            </a>
+            <a className="button dark" href="/login">
+              Get Started <ArrowRight size={15} />
+            </a>
+          </div>
+        </header>
+
+        <main className="landing-content">
+          <section className="landing-hero">
+            <span className="eyebrow">
+              <Flame size={14} /> ATOMIC HABITS FOR TEAMS
+            </span>
+            <h1>
+              Build habits with your squad.<br />
+              <em>1% better every day.</em>
+            </h1>
+            <p className="landing-subtitle">
+              The accountability partner app inspired by James Clear’s Atomic Habits.
+              Track daily streaks, see friends’ habits in real time, and give gentle nudges so no one misses twice.
+            </p>
+
+            <div className="landing-cta-row">
+              <a className="button dark hero-btn" href="/login">
+                Create Your Free Account <ArrowRight size={18} />
+              </a>
+              <button className="button light hero-btn" onClick={() => setModal({ kind: 'join' })}>
+                Enter Circle Invite Code
+              </button>
+            </div>
+
+            <div className="landing-quote-card">
+              <p>&ldquo;You do not rise to the level of your goals. You fall to the level of your systems.&rdquo;</p>
+              <span>JAMES CLEAR · ATOMIC HABITS</span>
+            </div>
+          </section>
+
+          {/* 3 VALUE PILLARS */}
+          <section className="landing-pillars">
+            <div className="pillar-card">
+              <div className="pillar-icon sage">
+                <Users size={22} />
+              </div>
+              <h3>Teammates Live Tracker</h3>
+              <p>
+                See your friends’ daily habits and completion progress. If a teammate hasn’t finished their habit, send a 1-tap friendly nudge!
+              </p>
+            </div>
+
+            <div className="pillar-card">
+              <div className="pillar-icon peach">
+                <Flame size={22} />
+              </div>
+              <h3>Atomic Streaks</h3>
+              <p>
+                Track individual and shared squad streaks. Built on the 4 Laws of Behavior Change: Make it Obvious, Attractive, Easy, and Satisfying.
+              </p>
+            </div>
+
+            <div className="pillar-card">
+              <div className="pillar-icon lavender">
+                <Sparkles size={22} />
+              </div>
+              <h3>Habit Stacking & 2-Min Rule</h3>
+              <p>
+                Anchor new habits to existing daily routines. Start with 2-minute effortless starter actions so you never burn out.
+              </p>
+            </div>
+          </section>
+        </main>
+
+        {/* JOIN MODAL FOR GUESTS */}
+        <dialog ref={dialog} className="modal" onCancel={() => setModal(null)} onClick={(e) => { if (e.target === dialog.current) setModal(null); }}>
+          <div className="modal-content">
+            <button className="modal-close icon-button" onClick={() => setModal(null)}><X size={20} /></button>
+            <div className="modal-symbol sage"><Users size={25} /></div>
+            <h2>Join with Circle Invite</h2>
+            <p className="modal-intro">Have an invite code from a teammate? Sign in or create an account to enter their circle.</p>
+            <a className="button dark full" href="/login">Sign in or Create Account <ArrowRight size={16} /></a>
+          </div>
+        </dialog>
+      </div>
+    );
+  }
+
+  // 3. LOGGED IN BUT NO CIRCLE YET (CLEAN ONBOARDING)
+  if (!data.team) {
+    return (
+      <div className={`app-shell ${darkMode ? 'dark-theme' : ''}`}>
+        <main className="circle-setup-page">
+          <Brand />
+          <div className="setup-card">
+            <Avatar person={account} />
+            <span className="eyebrow">STEP 1 · ACCOUNTABILITY CIRCLE</span>
+            <h1>Welcome, {account.name}!</h1>
+            <p className="modal-intro">
+              Create your private accountability circle to start planting habits and inviting your teammates.
+            </p>
+
+            <form onSubmit={submit} className="setup-form">
+              <label>
+                Your Display Name
+                <input name="displayName" defaultValue={account.name} maxLength={40} required autoFocus />
+              </label>
+
+              <label>
+                Circle Name
+                <input name="name" placeholder="e.g. Focus Squad, 5AM Club, Gym Partners" maxLength={60} required />
+              </label>
+
+              <button className="button dark full" disabled={busy}>
+                {busy ? 'Creating circle…' : 'Create Circle & Start Tracking'} <ArrowRight size={16} />
+              </button>
+            </form>
+
+            <div className="setup-divider"><span>OR JOIN WITH CODE</span></div>
+
+            <button className="button light full" onClick={() => setModal({ kind: 'join' })}>
+              Join Friend’s Circle with Invite Code
+            </button>
+          </div>
+
+          <dialog ref={dialog} className="modal" onCancel={() => setModal(null)} onClick={(e) => { if (e.target === dialog.current) setModal(null); }}>
+            <div className="modal-content">
+              <button className="modal-close icon-button" onClick={() => setModal(null)}><X size={20} /></button>
+              <h2>Join an Existing Circle</h2>
+              <p className="modal-intro">Enter the invitation token or code provided by your teammate.</p>
+              <form onSubmit={submit}>
+                <label>
+                  Your Display Name
+                  <input name="displayName" defaultValue={account.name} maxLength={40} required />
+                </label>
+                <label>
+                  Invite Code / Token
+                  <input name="token" defaultValue={joinToken} placeholder="Paste invite token here" required />
+                </label>
+                <button className="button dark full" disabled={busy}>
+                  {busy ? 'Joining…' : 'Join Circle'} <ArrowRight size={16} />
+                </button>
+              </form>
+            </div>
+          </dialog>
+        </main>
+      </div>
+    );
+  }
+
+  const currentTeam = data.team;
+
+  // 4. ACTIVE LOGGED-IN DASHBOARD (REAL USER DATA ONLY)
   return (
     <div className={`app-shell ${darkMode ? 'dark-theme' : ''}`}>
       {/* SIDEBAR NAVIGATION */}
@@ -532,7 +613,7 @@ export default function TeamUp() {
           <Brand />
         </button>
 
-        <div className="workspace-label">ACCOUNTABILITY CIRCLE</div>
+        <div className="workspace-label">ACCOUNTABILITY SQUAD</div>
 
         <nav>
           {nav.map(({ name, icon: Icon }) => (
@@ -555,24 +636,22 @@ export default function TeamUp() {
             <Users size={18} />
           </div>
           <span>
-            <strong>{data.team.name}</strong>
+            <strong>{currentTeam.name}</strong>
             <small>
-              {data.members.length} teammates · {squadStreak}d squad streak 🔥
+              {data.members.length} {data.members.length === 1 ? 'member' : 'members'} · {squadStreak}d squad streak 🔥
             </small>
           </span>
         </div>
 
         <button className="invite-side" onClick={openInvite}>
-          <Plus size={16} /> Invite a teammate
+          <UserPlus size={16} /> Invite teammates
         </button>
 
         {/* BOTTOM SECTION */}
         <div className="sidebar-bottom">
           <div className="sidebar-quote">
             <Sprout size={20} />
-            <p>
-              &ldquo;You do not rise to the level of your goals. You fall to the level of your systems.&rdquo;
-            </p>
+            <p>&ldquo;Every action you take is a vote for the type of person you wish to become.&rdquo;</p>
             <span>JAMES CLEAR · ATOMIC HABITS</span>
           </div>
 
@@ -587,7 +666,7 @@ export default function TeamUp() {
             <Avatar person={data.user} />
             <span>
               <strong>{data.user.name}</strong>
-              <small>{demo ? 'Exploring demo · Connect cloud' : 'Syncing with Supabase'}</small>
+              <small>{currentTeam.name}</small>
             </span>
             <Settings2 size={17} />
           </button>
@@ -602,20 +681,10 @@ export default function TeamUp() {
           </button>
 
           <div className="breadcrumb">
-            Your circle <span>/</span> <strong>{view}</strong>
+            {currentTeam.name} <span>/</span> <strong>{view}</strong>
           </div>
 
           <div className="top-actions">
-            {demo ? (
-              <button className="demo-pill" onClick={() => setModal({ kind: 'create' })}>
-                <span /> Demo mode <ArrowUpRight size={13} />
-              </button>
-            ) : (
-              <span className="live-pill">
-                <span /> Connected
-              </span>
-            )}
-
             <button className="theme-icon-btn" onClick={toggleTheme} aria-label="Toggle theme">
               {darkMode ? <Sun size={17} /> : <Moon size={17} />}
             </button>
@@ -648,25 +717,19 @@ export default function TeamUp() {
         </header>
 
         <main>
-          {loadError && (
-            <div className="error-banner">
-              {loadError} <button onClick={() => refresh()}>Retry connection</button>
-            </div>
-          )}
-
           {/* VIEW: TODAY */}
           {view === 'Today' && (
             <>
-              {/* TOP HERO MOTIVATION BANNER */}
+              {/* TOP HERO */}
               <section className="greeting">
                 <div>
                   <div className="eyebrow">
-                    <Flame size={15} className="flame-icon" /> ATOMIC MOMENTUM · 1% BETTER TOGETHER
+                    <Flame size={15} className="flame-icon" /> 1% BETTER TODAY
                   </div>
                   <h1>
-                    Small habits. <em>Remarkable team.</em>
+                    Welcome back, <em>{data.user.name}.</em>
                   </h1>
-                  <p>Check in for today, cheer on your friends, and never miss twice.</p>
+                  <p>Check in for today, keep your squad accountable, and never miss twice.</p>
                 </div>
                 <div className="greeting-actions">
                   <button className="button dark" onClick={() => setModal({ kind: 'habit' })}>
@@ -678,16 +741,16 @@ export default function TeamUp() {
                 </div>
               </section>
 
-              {/* SQUAD PULSE / ACCOUNTABILITY BANNER */}
+              {/* SQUAD PULSE BANNER */}
               <section className="squad-pulse-card">
                 <div className="pulse-info">
                   <span className="eyebrow-accent">
-                    <Zap size={14} /> LIVE SQUAD ACCOUNTABILITY
+                    <Zap size={14} /> SQUAD PULSE
                   </span>
                   <h2>{teamRatio}% of team habits completed today</h2>
                   <p>
-                    {teamDoneToday} of {allTeamHabits.length} habits checked off across{' '}
-                    <strong>{data.members.length} teammates</strong>.
+                    {teamDoneToday} of {allTeamHabits.length} habits logged across{' '}
+                    <strong>{data.members.length} {data.members.length === 1 ? 'member' : 'members'}</strong>.
                   </p>
                   <div className="pulse-members">
                     <div className="avatar-stack">
@@ -713,7 +776,7 @@ export default function TeamUp() {
                 </div>
               </section>
 
-              {/* VIEW SWITCHER SUB-TABS */}
+              {/* SUBTAB BAR */}
               <div className="subtab-bar">
                 <button
                   className={`subtab-btn ${subTab === 'my-habits' ? 'active' : ''}`}
@@ -726,7 +789,7 @@ export default function TeamUp() {
                   onClick={() => setSubTab('team-tracker')}
                 >
                   <Users size={16} /> Teammates Live Tracker ({teammates.length})
-                  <span className="live-badge">Live</span>
+                  {teammates.length > 0 && <span className="live-badge">Live</span>}
                 </button>
               </div>
 
@@ -809,7 +872,7 @@ export default function TeamUp() {
                       </span>
                     </div>
 
-                    {/* HABIT CARDS */}
+                    {/* HABIT LIST */}
                     <div className="habit-list">
                       {mine
                         .filter((h) => filter === 'All' || h.time === filter)
@@ -879,21 +942,64 @@ export default function TeamUp() {
                           );
                         })}
 
-                      {mine.filter((h) => filter === 'All' || h.time === filter).length === 0 && (
-                        <div className="empty-state">
-                          <Sprout size={36} />
-                          <h3>No habits in this window yet.</h3>
-                          <p>Start with one tiny atomic habit. Make it so easy you can’t say no.</p>
-                          <button className="button light" onClick={() => setModal({ kind: 'habit' })}>
-                            <Plus size={16} /> Add a habit
+                      {/* CLEAN EMPTY STATE WITH 1-CLICK ATOMIC STARTERS */}
+                      {mine.length === 0 && (
+                        <div className="empty-state-card">
+                          <Sprout size={40} className="empty-sprout" />
+                          <h3>Plant your first atomic habit</h3>
+                          <p>
+                            &ldquo;You do not rise to the level of your goals. You fall to the level of your systems.&rdquo;
+                            Pick a proven habit starter below or create your custom one.
+                          </p>
+
+                          <div className="empty-templates-grid">
+                            {ATOMIC_HABIT_TEMPLATES.map((tpl) => (
+                              <button
+                                key={tpl.name}
+                                className="empty-tpl-btn"
+                                onClick={async () => {
+                                  setBusy(true);
+                                  try {
+                                    await api({
+                                      action: 'add_habit',
+                                      name: tpl.name,
+                                      identity: tpl.identity,
+                                      target: tpl.target,
+                                      category: tpl.category,
+                                      time: tpl.time,
+                                      stackAfter: tpl.stackAfter,
+                                      twoMinuteStarter: tpl.twoMinuteStarter,
+                                    });
+                                    await refresh();
+                                    notify(`🌱 "${tpl.name}" planted!`);
+                                  } catch (e) {
+                                    notify((e as Error).message);
+                                  } finally {
+                                    setBusy(false);
+                                  }
+                                }}
+                              >
+                                <span className={`tpl-cat-dot ${tpl.category}`} />
+                                <div>
+                                  <strong>+ {tpl.name}</strong>
+                                  <small>{tpl.target}</small>
+                                </div>
+                              </button>
+                            ))}
+                          </div>
+
+                          <button className="button dark" onClick={() => setModal({ kind: 'habit' })}>
+                            <Plus size={16} /> Create Custom Habit
                           </button>
                         </div>
                       )}
                     </div>
 
-                    <button className="add-habit-row" onClick={() => setModal({ kind: 'habit' })}>
-                      <Plus size={16} /> Plant the seed for a new habit
-                    </button>
+                    {mine.length > 0 && (
+                      <button className="add-habit-row" onClick={() => setModal({ kind: 'habit' })}>
+                        <Plus size={16} /> Plant another habit
+                      </button>
+                    )}
                   </section>
 
                   {/* RIGHT COLUMN */}
@@ -922,7 +1028,7 @@ export default function TeamUp() {
                           </div>
                         </div>
                         <div>
-                          <span className="tiny-label">CURRENT RHYTHM</span>
+                          <span className="tiny-label">DAILY RHYTHM</span>
                           <h4>
                             {todayDone === mine.length && mine.length
                               ? 'All habits complete! 🔥'
@@ -932,7 +1038,7 @@ export default function TeamUp() {
                           </h4>
                           <p>
                             {todayDone === mine.length && mine.length
-                              ? 'Every promise to yourself kept today.'
+                              ? 'Every promise kept today.'
                               : 'One small win creates the spark.'}
                           </p>
                           <span className="warm-tag">
@@ -942,68 +1048,73 @@ export default function TeamUp() {
                       </div>
                     </section>
 
-                    {/* LIVE ACCOUNTABILITY HIGHLIGHT */}
+                    {/* SQUAD HIGHLIGHT */}
                     <section className="circle-card">
                       <div className="section-title">
-                        <h3>Teammates activity</h3>
+                        <h3>Your squad</h3>
                         <button className="text-button" onClick={() => setSubTab('team-tracker')}>
-                          Full board <ArrowUpRight size={14} />
+                          View all <ArrowUpRight size={14} />
                         </button>
                       </div>
-                      <p className="section-subtitle">Keep each other accountable today.</p>
 
-                      <div className="mini-member-list">
-                        {teammates.slice(0, 3).map((p) => {
-                          const stats = personStats(p);
-                          const isAllDone = stats.n === stats.hs.length && stats.hs.length > 0;
-                          return (
-                            <div className="member-row" key={p.id}>
-                              <button
-                                className="member-main"
-                                onClick={() => setModal({ kind: 'person', person: p })}
-                              >
-                                <Avatar person={p} small />
-                                <span>
-                                  <strong>{p.name}</strong>
-                                  <small>
-                                    {isAllDone
-                                      ? 'All habits finished ✨'
-                                      : `${stats.n}/${stats.hs.length} habits done`}
-                                  </small>
+                      {teammates.length === 0 ? (
+                        <div className="empty-squad-mini">
+                          <p>You’re the first in this circle!</p>
+                          <small>Invite your friends to track each other’s habits.</small>
+                          <button className="button light full" onClick={openInvite}>
+                            <UserPlus size={15} /> Invite Teammates
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="mini-member-list">
+                          {teammates.slice(0, 3).map((p) => {
+                            const stats = personStats(p);
+                            const isAllDone = stats.n === stats.hs.length && stats.hs.length > 0;
+                            return (
+                              <div className="member-row" key={p.id}>
+                                <button
+                                  className="member-main"
+                                  onClick={() => setModal({ kind: 'person', person: p })}
+                                >
+                                  <Avatar person={p} small />
+                                  <span>
+                                    <strong>{p.name}</strong>
+                                    <small>
+                                      {isAllDone
+                                        ? 'All habits finished ✨'
+                                        : `${stats.n}/${stats.hs.length} habits done`}
+                                    </small>
+                                  </span>
+                                </button>
+                                <span className="mini-streak">
+                                  <Flame size={13} />
+                                  {stats.streak}
                                 </span>
-                              </button>
-                              <span className="mini-streak">
-                                <Flame size={13} />
-                                {stats.streak}
-                              </span>
-                              {isAllDone ? (
-                                <button
-                                  className="nudge celebrate"
-                                  onClick={() => setModal({ kind: 'encourage', person: p })}
-                                  title={`Cheer on ${p.name}`}
-                                >
-                                  <Heart size={15} />
-                                </button>
-                              ) : (
-                                <button
-                                  className="nudge"
-                                  onClick={() => setModal({ kind: 'nudge', person: p })}
-                                  title={`Nudge ${p.name} to finish habits`}
-                                >
-                                  <Zap size={15} />
-                                </button>
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
-
-                      <button className="invite-box-btn" onClick={openInvite}>
-                        <Share2 size={15} /> Invite more accountability partners
-                      </button>
+                                {isAllDone ? (
+                                  <button
+                                    className="nudge celebrate"
+                                    onClick={() => setModal({ kind: 'encourage', person: p })}
+                                    title={`Cheer on ${p.name}`}
+                                  >
+                                    <Heart size={15} />
+                                  </button>
+                                ) : (
+                                  <button
+                                    className="nudge"
+                                    onClick={() => setModal({ kind: 'nudge', person: p })}
+                                    title={`Nudge ${p.name}`}
+                                  >
+                                    <Zap size={15} />
+                                  </button>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
                     </section>
 
-                    {/* PERSPECTIVE LESSON CARD */}
+                    {/* ATOMIC PERSPECTIVE */}
                     <button
                       className="lesson-card"
                       onClick={() =>
@@ -1025,141 +1136,149 @@ export default function TeamUp() {
                 </div>
               )}
 
-              {/* SUBTAB: TEAMMATES LIVE TRACKER */}
+              {/* SUBTAB: TEAMMATES TRACKER */}
               {subTab === 'team-tracker' && (
                 <div className="team-tracker-view">
                   <div className="tracker-header">
                     <div>
                       <h2>Teammates Daily Tracker & Accountability</h2>
-                      <p>
-                        See what your friends are working on today. If they haven’t completed their
-                        habits, give them a friendly nudge!
-                      </p>
+                      <p>See what your friends are working on today. Nudge them if pending!</p>
                     </div>
                     <button className="button dark" onClick={openInvite}>
-                      <Plus size={16} /> Add a teammate
+                      <UserPlus size={16} /> Invite teammates
                     </button>
                   </div>
 
-                  <div className="teammates-full-grid">
-                    {teammates.map((p) => {
-                      const stats = personStats(p);
-                      const isAllDone = stats.n === stats.hs.length && stats.hs.length > 0;
-                      return (
-                        <article className="teammate-board-card" key={p.id}>
-                          <div className="board-card-top">
-                            <div className="board-person-meta">
-                              <Avatar person={p} glow={isAllDone} />
-                              <div>
-                                <h3>{p.name}</h3>
-                                <span className="handle-tag">{p.handle || `@${p.name.toLowerCase()}`}</span>
+                  {teammates.length === 0 ? (
+                    <div className="empty-squad-big">
+                      <div className="empty-squad-icon">
+                        <Users size={36} />
+                      </div>
+                      <h3>No teammates in your circle yet</h3>
+                      <p>
+                        Accountability multiplies habit consistency by 3x. Share your circle link or code with your gym buddies, co-workers, or friends.
+                      </p>
+                      <button className="button dark" onClick={openInvite}>
+                        <Share2 size={16} /> Invite Teammates Now
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="teammates-full-grid">
+                      {teammates.map((p) => {
+                        const stats = personStats(p);
+                        const isAllDone = stats.n === stats.hs.length && stats.hs.length > 0;
+                        return (
+                          <article className="teammate-board-card" key={p.id}>
+                            <div className="board-card-top">
+                              <div className="board-person-meta">
+                                <Avatar person={p} glow={isAllDone} />
+                                <div>
+                                  <h3>{p.name}</h3>
+                                  <span className="handle-tag">{p.handle || `@${p.name.toLowerCase()}`}</span>
+                                </div>
                               </div>
-                            </div>
-                            <div className="board-badges">
                               <span className="streak-badge active">
                                 <Flame size={14} />
                                 <strong>{stats.streak}</strong>
                                 <small>days</small>
                               </span>
                             </div>
-                          </div>
 
-                          <div className="board-progress-bar">
-                            <div className="bar-labels">
-                              <span>Today’s Progress</span>
-                              <strong>
-                                {stats.n} of {stats.hs.length} completed
-                              </strong>
-                            </div>
-                            <div className="bar-track">
-                              <div
-                                className="bar-fill"
-                                style={{
-                                  width: `${stats.hs.length ? (stats.n / stats.hs.length) * 100 : 0}%`,
-                                }}
-                              />
-                            </div>
-                          </div>
-
-                          {/* LIST OF HABITS */}
-                          <div className="teammate-habit-checklist">
-                            {stats.hs.map((h) => {
-                              const isHabitDone = done(h, today);
-                              const meta = categoryInfo[h.category] || categoryInfo.mind;
-                              const Icon = meta.icon;
-
-                              return (
+                            <div className="board-progress-bar">
+                              <div className="bar-labels">
+                                <span>Today’s Progress</span>
+                                <strong>
+                                  {stats.n} of {stats.hs.length} completed
+                                </strong>
+                              </div>
+                              <div className="bar-track">
                                 <div
-                                  key={h.id}
-                                  className={`teammate-habit-row ${isHabitDone ? 'done' : 'pending'}`}
-                                >
-                                  <div className="th-left">
-                                    <span className={`th-icon ${meta.color}`}>
-                                      <Icon size={14} />
-                                    </span>
-                                    <div>
-                                      <div className="th-name">{h.name}</div>
-                                      <small className="th-identity">Becoming {h.identity}</small>
+                                  className="bar-fill"
+                                  style={{
+                                    width: `${stats.hs.length ? (stats.n / stats.hs.length) * 100 : 0}%`,
+                                  }}
+                                />
+                              </div>
+                            </div>
+
+                            <div className="teammate-habit-checklist">
+                              {stats.hs.map((h) => {
+                                const isHabitDone = done(h, today);
+                                const meta = categoryInfo[h.category] || categoryInfo.mind;
+                                const Icon = meta.icon;
+
+                                return (
+                                  <div
+                                    key={h.id}
+                                    className={`teammate-habit-row ${isHabitDone ? 'done' : 'pending'}`}
+                                  >
+                                    <div className="th-left">
+                                      <span className={`th-icon ${meta.color}`}>
+                                        <Icon size={14} />
+                                      </span>
+                                      <div>
+                                        <div className="th-name">{h.name}</div>
+                                        <small className="th-identity">Becoming {h.identity}</small>
+                                      </div>
+                                    </div>
+                                    <div className="th-right">
+                                      {isHabitDone ? (
+                                        <span className="th-done-badge">
+                                          <Check size={13} strokeWidth={2.4} /> Done
+                                        </span>
+                                      ) : (
+                                        <button
+                                          className="th-nudge-btn"
+                                          onClick={() =>
+                                            setModal({
+                                              kind: 'nudge',
+                                              person: p,
+                                              habit: h,
+                                              habitId: h.id,
+                                            })
+                                          }
+                                        >
+                                          <Zap size={13} /> Nudge
+                                        </button>
+                                      )}
                                     </div>
                                   </div>
-                                  <div className="th-right">
-                                    {isHabitDone ? (
-                                      <span className="th-done-badge">
-                                        <Check size={13} strokeWidth={2.4} /> Done
-                                      </span>
-                                    ) : (
-                                      <button
-                                        className="th-nudge-btn"
-                                        onClick={() =>
-                                          setModal({
-                                            kind: 'nudge',
-                                            person: p,
-                                            habit: h,
-                                            habitId: h.id,
-                                          })
-                                        }
-                                        title={`Nudge ${p.name} on this habit`}
-                                      >
-                                        <Zap size={13} /> Nudge
-                                      </button>
-                                    )}
-                                  </div>
-                                </div>
-                              );
-                            })}
+                                );
+                              })}
 
-                            {!stats.hs.length && (
-                              <p className="no-habits-note">No habits added yet.</p>
-                            )}
-                          </div>
+                              {!stats.hs.length && (
+                                <p className="no-habits-note">No habits added by this teammate yet.</p>
+                              )}
+                            </div>
 
-                          <div className="board-card-footer">
-                            <button
-                              className="text-button"
-                              onClick={() => setModal({ kind: 'person', person: p })}
-                            >
-                              View profile & badges <ArrowUpRight size={14} />
-                            </button>
-                            {isAllDone ? (
+                            <div className="board-card-footer">
                               <button
-                                className="button light cheer-btn"
-                                onClick={() => setModal({ kind: 'encourage', person: p })}
+                                className="text-button"
+                                onClick={() => setModal({ kind: 'person', person: p })}
                               >
-                                <Heart size={15} /> Cheer on 🎉
+                                View profile <ArrowUpRight size={14} />
                               </button>
-                            ) : (
-                              <button
-                                className="button dark nudge-all-btn"
-                                onClick={() => setModal({ kind: 'nudge', person: p })}
-                              >
-                                <Zap size={15} /> Nudge teammate ⚡
-                              </button>
-                            )}
-                          </div>
-                        </article>
-                      );
-                    })}
-                  </div>
+                              {isAllDone ? (
+                                <button
+                                  className="button light cheer-btn"
+                                  onClick={() => setModal({ kind: 'encourage', person: p })}
+                                >
+                                  <Heart size={15} /> Cheer on 🎉
+                                </button>
+                              ) : (
+                                <button
+                                  className="button dark nudge-all-btn"
+                                  onClick={() => setModal({ kind: 'nudge', person: p })}
+                                >
+                                  <Zap size={15} /> Nudge teammate ⚡
+                                </button>
+                              )}
+                            </div>
+                          </article>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               )}
             </>
@@ -1173,26 +1292,20 @@ export default function TeamUp() {
                   <div className="eyebrow">
                     <Users size={15} /> YOUR ACCOUNTABILITY SQUAD
                   </div>
-                  <h1>
-                    Better together. <em>Never alone.</em>
-                  </h1>
-                  <p>When friends check in together, consistency multiplies by 3x.</p>
+                  <h1>{currentTeam.name}</h1>
+                  <p>When friends check in together, consistency multiplies.</p>
                 </div>
                 <button className="button dark" onClick={openInvite}>
-                  <Plus size={17} /> Invite teammate
+                  <UserPlus size={17} /> Invite teammate
                 </button>
               </section>
 
-              {/* OVERVIEW STATS */}
               <section className="circle-overview">
                 <div>
-                  <span className="eyebrow">{data.team.name}</span>
-                  <h2>
-                    {teamRatio}% of today’s promises, kept.
-                  </h2>
+                  <span className="eyebrow">{currentTeam.name}</span>
+                  <h2>{teamRatio}% of today’s promises, kept.</h2>
                   <p>
-                    {teamDoneToday} habits completed across your circle today. {squadStreak}-day
-                    continuous squad streak!
+                    {teamDoneToday} habits completed across your circle today. {squadStreak}-day squad streak!
                   </p>
                 </div>
                 <div className="big-avatars">
@@ -1202,13 +1315,12 @@ export default function TeamUp() {
                 </div>
                 <div className="circle-overview-stat">
                   <strong>{data.members.length}</strong>
-                  <span>growing together</span>
+                  <span>{data.members.length === 1 ? 'member' : 'members'}</span>
                 </div>
               </section>
 
-              {/* MEMBERS LIST */}
               <div className="section-title spacious">
-                <h2>The people in your corner</h2>
+                <h2>Members in your circle</h2>
                 <span className="quiet-caption">Encouragement over comparison</span>
               </div>
 
@@ -1242,17 +1354,12 @@ export default function TeamUp() {
                         ))}
                       </div>
 
-                      <div className="shared-achievements">
-                        <Trophy size={13} />
-                        {earned(p).length} milestones earned
-                      </div>
-
                       <div className="person-card-actions">
                         <button
                           className="text-button"
                           onClick={() => setModal({ kind: 'person', person: p })}
                         >
-                          View journey <ArrowUpRight size={14} />
+                          View profile <ArrowUpRight size={14} />
                         </button>
                         {p.id !== data.user.id && (
                           <button
@@ -1272,81 +1379,72 @@ export default function TeamUp() {
                     <Plus size={26} />
                   </span>
                   <h3>Make room for one more.</h3>
-                  <p>
-                    Invite a close friend or colleague to keep you honest.
-                  </p>
+                  <p>Invite a friend to keep you accountable.</p>
                   <strong>Invite a teammate <ArrowUpRight size={14} /></strong>
                 </button>
               </div>
 
-              {/* RECENT ACTIVITY & REFLECTIONS */}
+              {/* RECENT ACTIVITY */}
               <div className="circle-bottom">
                 <section className="panel">
                   <div className="section-title">
-                    <h2>Live activity & kind words</h2>
+                    <h2>Live activity & nudges</h2>
                     <button className="text-button" onClick={() => setModal({ kind: 'reflect' })}>
                       <PenLine size={15} /> Share a win
                     </button>
                   </div>
 
-                  <div className="activity-note-list">
-                    {data.notes.map((note) => {
-                      const author = data.members.find((p) => p.id === note.userId) || data.user;
-                      const to = data.members.find((p) => p.id === note.recipient);
-                      const isNudge = note.kind === 'nudge';
-                      const isCheer = note.kind === 'cheer';
+                  {data.notes.length === 0 ? (
+                    <div className="empty-notes-box">
+                      <p>No activity notes yet. Send a nudge or share your first daily win!</p>
+                    </div>
+                  ) : (
+                    <div className="activity-note-list">
+                      {data.notes.map((note) => {
+                        const author = data.members.find((p) => p.id === note.userId) || data.user;
+                        const to = data.members.find((p) => p.id === note.recipient);
+                        const isNudge = note.kind === 'nudge';
+                        const isCheer = note.kind === 'cheer';
 
-                      return (
-                        <div className="note" key={note.id}>
-                          <Avatar person={author} small />
-                          <div className="note-content">
-                            <p>
-                              <strong>{author.name}</strong>
-                              {to && (
-                                <>
-                                  {' '}
-                                  <span className="muted">
-                                    {isNudge ? 'nudged ⚡' : isCheer ? 'cheered on 🎉' : 'cheered on'}
-                                  </span>{' '}
-                                  <strong>{to.name}</strong>
-                                </>
-                              )}
-                            </p>
-                            <p className="note-body">{note.message}</p>
-                            <small>
-                              {new Date(note.created).toLocaleTimeString([], {
-                                hour: '2-digit',
-                                minute: '2-digit',
-                              })}{' '}
-                              · {note.kind === 'reflect' ? 'Reflection' : isNudge ? 'Nudge' : 'Cheer'}
-                            </small>
+                        return (
+                          <div className="note" key={note.id}>
+                            <Avatar person={author} small />
+                            <div className="note-content">
+                              <p>
+                                <strong>{author.name}</strong>
+                                {to && (
+                                  <>
+                                    {' '}
+                                    <span className="muted">
+                                      {isNudge ? 'nudged ⚡' : isCheer ? 'cheered on 🎉' : 'cheered on'}
+                                    </span>{' '}
+                                    <strong>{to.name}</strong>
+                                  </>
+                                )}
+                              </p>
+                              <p className="note-body">{note.message}</p>
+                              <small>
+                                {new Date(note.created).toLocaleTimeString([], {
+                                  hour: '2-digit',
+                                  minute: '2-digit',
+                                })}
+                              </small>
+                            </div>
+                            {isNudge ? <Zap size={15} className="note-zap" /> : <Heart size={15} className="note-heart" />}
                           </div>
-                          {isNudge ? (
-                            <Zap size={15} className="note-zap" />
-                          ) : (
-                            <Heart size={15} className="note-heart" />
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </section>
 
                 <section className="circle-principles">
                   <Sprout size={28} />
                   <h2>Atomic Circle Principles</h2>
-                  <p>
-                    We celebrate effort over perfection. We encourage gently. We never miss twice.
-                  </p>
-                  <div>
-                    <Check size={15} /> Show up as you are, even for 2 minutes
-                  </div>
-                  <div>
-                    <Check size={15} /> Celebrate the tiny daily wins
-                  </div>
-                  <div>
-                    <Check size={15} /> Give an empowering nudge, never guilt
-                  </div>
+                  <p>We celebrate effort. We encourage gently. We never miss twice.</p>
+                  <div><Check size={15} /> Show up as you are, even for 2 minutes</div>
+                  <div><Check size={15} /> Celebrate the tiny daily wins</div>
+                  <div><Check size={15} /> Give an empowering nudge, never guilt</div>
                 </section>
               </div>
             </>
@@ -1357,158 +1455,57 @@ export default function TeamUp() {
             <>
               <section className="greeting">
                 <div>
-                  <div className="eyebrow">
-                    <ChartNoAxesCombined size={15} /> COMPOUND RESULTS
-                  </div>
-                  <h1>
-                    Small steps. <em>Real growth.</em>
-                  </h1>
-                  <p>Consistency is not a talent. It is an accumulation of choices.</p>
+                  <div className="eyebrow"><ChartNoAxesCombined size={15} /> COMPOUND RESULTS</div>
+                  <h1>Small steps. <em>Real growth.</em></h1>
+                  <p>Consistency is an accumulation of daily votes for your future self.</p>
                 </div>
-                <button className="button light" onClick={() => setModal({ kind: 'reflect' })}>
-                  <PenLine size={16} /> Add reflection
-                </button>
               </section>
 
-              <div className="segmented">
-                {['Overview', 'Milestones'].map((t) => (
-                  <button
-                    key={t}
-                    className={progressTab === t ? 'selected' : ''}
-                    onClick={() => setProgressTab(t)}
-                  >
-                    {t}
-                  </button>
-                ))}
+              <div className="stats-grid">
+                <div className="stat-card">
+                  <BookOpen size={21} />
+                  <span>Total repetitions</span>
+                  <strong>{totalChecks}</strong>
+                  <p>Repetitions completed</p>
+                </div>
+                <div className="stat-card sage">
+                  <Flame size={21} />
+                  <span>Best current streak</span>
+                  <strong>{bestStreak}<em> days</em></strong>
+                  <p>Unbroken daily cadence</p>
+                </div>
+                <div className="stat-card lavender">
+                  <Target size={21} />
+                  <span>Today’s consistency</span>
+                  <strong>{mine.length ? Math.round((todayDone / mine.length) * 100) : 0}<em>%</em></strong>
+                  <p>{todayDone} of {mine.length} daily habits complete</p>
+                </div>
               </div>
 
-              {progressTab === 'Overview' ? (
-                <>
-                  <div className="stats-grid">
-                    <div className="stat-card">
-                      <BookOpen size={21} />
-                      <span>Total repetitions</span>
-                      <strong>{totalChecks}</strong>
-                      <p>Small votes for your desired identity</p>
-                    </div>
-                    <div className="stat-card sage">
-                      <Flame size={21} />
-                      <span>Best current streak</span>
-                      <strong>
-                        {bestStreak}
-                        <em> days</em>
-                      </strong>
-                      <p>Unbroken daily cadence</p>
-                    </div>
-                    <div className="stat-card lavender">
-                      <Target size={21} />
-                      <span>Today&apos;s consistency</span>
-                      <strong>
-                        {mine.length ? Math.round((todayDone / mine.length) * 100) : 0}
-                        <em>%</em>
-                      </strong>
-                      <p>
-                        {todayDone} of {mine.length} daily habits complete
-                      </p>
-                    </div>
+              <section className="panel activity-panel">
+                <div className="section-title">
+                  <div>
+                    <h2>Consistency Calendar (12 Weeks)</h2>
+                    <p className="section-subtitle">Every filled block is a promise kept.</p>
                   </div>
-
-                  {/* HEATMAP */}
-                  <section className="panel activity-panel">
-                    <div className="section-title">
-                      <div>
-                        <h2>Consistency Calendar (12 Weeks)</h2>
-                        <p className="section-subtitle">
-                          Every filled block is a promise kept to yourself.
-                        </p>
-                      </div>
-                      <span className="quiet-caption">{totalChecks} total check-ins</span>
-                    </div>
-
-                    <div className="heatmap">
-                      {Array.from({ length: 84 }, (_, i) => {
-                        const day = shiftDay(today, i - 83);
-                        const count = data.checkins.filter(
-                          (c) => c.day === day && mine.some((h) => h.id === c.habitId)
-                        ).length;
-                        return (
-                          <div
-                            key={day}
-                            tabIndex={0}
-                            title={`${day}: ${count} habits complete`}
-                            aria-label={`${day}: ${count} habits complete`}
-                            className={`heat heat-${Math.min(count, 4)}`}
-                          />
-                        );
-                      })}
-                    </div>
-                    <div className="heatmap-key">
-                      <span>Less</span>
-                      {[0, 1, 2, 3, 4].map((i) => (
-                        <i key={i} className={`heat heat-${i}`} />
-                      ))}
-                      <span>More</span>
-                    </div>
-                  </section>
-
-                  {/* HABIT BREAKDOWN */}
-                  <section className="panel">
-                    <h2>Habit Breakdown & Repetitions</h2>
-                    <div className="habit-breakdown">
-                      {mine.map((h) => {
-                        const count = data.checkins.filter((c) => c.habitId === h.id).length;
-                        return (
-                          <div key={h.id}>
-                            <div>
-                              <strong>{h.name}</strong>
-                              <span>{count} repetitions</span>
-                            </div>
-                            <div className="progress-track">
-                              <i
-                                className={categoryInfo[h.category]?.color || 'sand'}
-                                style={{
-                                  width: `${totalChecks ? (count / totalChecks) * 100 : 0}%`,
-                                }}
-                              />
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </section>
-                </>
-              ) : (
-                <div className="milestone-grid">
-                  {[
-                    { n: 1, title: 'The First Little Step', copy: 'Complete your first habit.', icon: Sprout, met: totalChecks >= 1 },
-                    { n: 7, title: 'A Week of Showing Up', copy: 'Build a 7-day habit streak.', icon: Flame, met: bestEver >= 7 },
-                    { n: 15, title: 'Habit Stacking Master', copy: 'Complete 15 anchored habits.', icon: Layers, met: totalChecks >= 15 },
-                    { n: 21, title: 'Finding Your Rhythm', copy: 'Build a 21-day habit streak.', icon: Sparkles, met: bestEver >= 21 },
-                    { n: 30, title: 'Thirty Promises Kept', copy: 'Complete 30 habit repetitions.', icon: Trophy, met: totalChecks >= 30 },
-                    { n: 100, title: 'The Century Club', copy: 'Complete 100 habit repetitions.', icon: Heart, met: totalChecks >= 100 },
-                  ].map((m) => (
-                    <article className={`milestone ${m.met ? 'unlocked' : ''}`} key={m.title}>
-                      <span className="medal">
-                        <m.icon size={28} />
-                      </span>
-                      <span className="tiny-label">{m.met ? 'ACHIEVED' : 'IN PROGRESS'}</span>
-                      <h2>{m.title}</h2>
-                      <p>{m.copy}</p>
-                      <span className="milestone-status">
-                        {m.met ? (
-                          <>
-                            <Check size={14} /> Unlocked & Celebrated
-                          </>
-                        ) : (
-                          <>
-                            <Sprout size={14} /> Keep building daily
-                          </>
-                        )}
-                      </span>
-                    </article>
-                  ))}
+                  <span className="quiet-caption">{totalChecks} total check-ins</span>
                 </div>
-              )}
+
+                <div className="heatmap">
+                  {Array.from({ length: 84 }, (_, i) => {
+                    const day = shiftDay(today, i - 83);
+                    const count = data.checkins.filter((c) => c.day === day && mine.some((h) => h.id === c.habitId)).length;
+                    return (
+                      <div
+                        key={day}
+                        tabIndex={0}
+                        title={`${day}: ${count} habits complete`}
+                        className={`heat heat-${Math.min(count, 4)}`}
+                      />
+                    );
+                  })}
+                </div>
+              </section>
             </>
           )}
 
@@ -1517,13 +1514,9 @@ export default function TeamUp() {
             <>
               <section className="greeting">
                 <div>
-                  <div className="eyebrow">
-                    <Sprout size={15} /> ATOMIC HABITS SYSTEM
-                  </div>
-                  <h1>
-                    Master your <em>habits.</em>
-                  </h1>
-                  <p>Principles from James Clear to help you build systems that last.</p>
+                  <div className="eyebrow"><Sprout size={15} /> ATOMIC HABITS SYSTEM</div>
+                  <h1>Master your <em>habits.</em></h1>
+                  <p>Core principles from James Clear to help you build systems that last.</p>
                 </div>
               </section>
 
@@ -1534,23 +1527,8 @@ export default function TeamUp() {
                     <h2>{l.title}</h2>
                     <p>{l.body.split('\n')[0]}</p>
                     <div className="library-card-foot">
-                      <button
-                        className="text-button"
-                        onClick={() => setModal({ kind: 'lesson', title: l.title, body: l.body })}
-                      >
+                      <button className="text-button" onClick={() => setModal({ kind: 'lesson', title: l.title, body: l.body })}>
                         Read lesson <ArrowUpRight size={15} />
-                      </button>
-                      <button
-                        className={`save-lesson ${saved.includes(i) ? 'saved' : ''}`}
-                        aria-label="Save lesson"
-                        onClick={() => {
-                          const next = saved.includes(i) ? saved.filter((s) => s !== i) : [...saved, i];
-                          setSaved(next);
-                          localStorage.setItem('team-up-saved-lessons', JSON.stringify(next));
-                          notify(saved.includes(i) ? 'Removed from saved.' : 'Saved to favorites.');
-                        }}
-                      >
-                        <Heart size={17} fill={saved.includes(i) ? 'currentColor' : 'none'} />
                       </button>
                     </div>
                   </article>
@@ -1564,17 +1542,11 @@ export default function TeamUp() {
             <>
               <section className="greeting">
                 <div>
-                  <div className="eyebrow">
-                    <Timer size={15} /> DEEP WORK & INTENTION
-                  </div>
-                  <h1>
-                    A little room <em>to focus.</em>
-                  </h1>
-                  <p>Put your distractions away. Settle into the present moment.</p>
+                  <div className="eyebrow"><Timer size={15} /> FOCUS SESSION</div>
+                  <h1>A little room <em>to focus.</em></h1>
+                  <p>Put your phone away. Settle into the present moment.</p>
                 </div>
-                <span className="warm-tag">
-                  {sessions} {sessions === 1 ? 'session' : 'sessions'} completed
-                </span>
+                <span className="warm-tag">{sessions} sessions completed</span>
               </section>
 
               <div className="focus-layout">
@@ -1596,21 +1568,10 @@ export default function TeamUp() {
                   </div>
 
                   <div className={`timer-pebble ${endsAt ? 'running' : ''}`}>
-                    <span className="eyebrow">
-                      {endsAt ? 'DEEP IN THE FLOW' : 'MAKE A PROMISE TO THIS MOMENT'}
-                    </span>
+                    <span className="eyebrow">{endsAt ? 'IN THE FLOW' : 'MAKE A PROMISE TO THIS MOMENT'}</span>
                     <div className="timer-digits">
-                      {String(Math.floor(seconds / 60)).padStart(2, '0')}
-                      <span>:</span>
-                      {String(seconds % 60).padStart(2, '0')}
+                      {String(Math.floor(seconds / 60)).padStart(2, '0')}<span>:</span>{String(seconds % 60).padStart(2, '0')}
                     </div>
-                    <p>
-                      {seconds === 0
-                        ? 'Promise kept. Take a deep breath.'
-                        : endsAt
-                        ? 'One moment at a time.'
-                        : 'Select duration and begin.'}
-                    </p>
 
                     <div className="timer-buttons">
                       <button
@@ -1627,7 +1588,7 @@ export default function TeamUp() {
                         }}
                       >
                         {endsAt ? <Pause size={17} /> : <Play size={17} />}
-                        {endsAt ? 'Pause' : seconds < duration * 60 && seconds > 0 ? 'Continue' : 'Begin Focus'}
+                        {endsAt ? 'Pause' : 'Begin Focus'}
                       </button>
                       <button
                         className="icon-button reset"
@@ -1646,37 +1607,14 @@ export default function TeamUp() {
                 <aside>
                   <section className="panel focus-settings">
                     <h2>Anchor to a Habit</h2>
-                    <p className="section-subtitle">
-                      Automatically log your habit check-in when timer completes.
-                    </p>
-
                     <label>
                       Habit to log:
-                      <select
-                        value={focusHabit}
-                        onChange={(e) => setFocusHabit(e.target.value)}
-                        disabled={!!endsAt}
-                      >
+                      <select value={focusHabit} onChange={(e) => setFocusHabit(e.target.value)} disabled={!!endsAt}>
                         <option value="">Just pure focus</option>
                         {mine.map((h) => (
-                          <option key={h.id} value={h.id}>
-                            {h.name} ({h.target})
-                          </option>
+                          <option key={h.id} value={h.id}>{h.name}</option>
                         ))}
                       </select>
-                    </label>
-
-                    <label className="switch-label">
-                      <span>
-                        Auto-complete habit on timer finish
-                        <small>Never forget to mark your daily win.</small>
-                      </span>
-                      <input
-                        type="checkbox"
-                        checked={autoLog}
-                        onChange={(e) => setAutoLog(e.target.checked)}
-                        disabled={!focusHabit || !!endsAt}
-                      />
                     </label>
                   </section>
                 </aside>
@@ -1687,21 +1625,14 @@ export default function TeamUp() {
           <footer>
             <Brand />
             <span>Small habits. Remarkable results. Growing together.</span>
-            <button onClick={() => setModal({ kind: 'about' })}>
-              About Team Up <ArrowUpRight size={12} />
-            </button>
           </footer>
         </main>
       </div>
 
-      {/* MOBILE BOTTOM NAVIGATION */}
+      {/* MOBILE NAV */}
       <nav className="mobile-nav">
         {nav.map(({ name, icon: Icon }) => (
-          <button
-            className={view === name ? 'active' : ''}
-            key={name}
-            onClick={() => changeView(name)}
-          >
+          <button className={view === name ? 'active' : ''} key={name} onClick={() => changeView(name)}>
             <Icon size={20} />
             <span>{name === 'My circle' ? 'Circle' : name}</span>
           </button>
@@ -1711,112 +1642,48 @@ export default function TeamUp() {
       {/* MODALS */}
       <dialog
         ref={dialog}
-        className={`modal ${modal?.kind === 'lesson' ? 'reading-modal' : ''}`}
+        className="modal"
         onCancel={() => setModal(null)}
         onClick={(e) => {
           if (e.target === dialog.current) setModal(null);
         }}
       >
-        <div className="modal-content" key={modal?.kind + (modal?.habit?.id || '')}>
-          {toast && <div className="dialog-status" role="status">{toast}</div>}
-          <button
-            className="modal-close icon-button"
-            aria-label="Close dialog"
-            onClick={() => setModal(null)}
-          >
+        <div className="modal-content">
+          {toast && <div className="dialog-status">{toast}</div>}
+          <button className="modal-close icon-button" onClick={() => setModal(null)}>
             <X size={20} />
           </button>
 
-          {/* MODAL: ADD / EDIT HABIT WITH ATOMIC HABITS SYSTEM */}
+          {/* MODAL: ADD / EDIT HABIT */}
           {modal?.kind === 'habit' && (
             <>
-              <span className="modal-symbol peach">
-                <Sprout size={25} />
-              </span>
+              <div className="modal-symbol peach"><Sprout size={25} /></div>
               <span className="eyebrow">ATOMIC HABIT FORMULA</span>
-              <h2>{modal.habit ? 'Shape your habit.' : 'Plant an atomic habit.'}</h2>
-              <p className="modal-intro">
-                Clear cue. Tiny beginning. Compounding consistency.
-              </p>
-
-              {/* TEMPLATES SHORTCUTS */}
-              {!modal.habit && (
-                <div className="template-strip">
-                  <span className="tiny-label">POPULAR STARTERS:</span>
-                  <div className="template-pills">
-                    {ATOMIC_HABIT_TEMPLATES.slice(0, 3).map((tpl) => (
-                      <button
-                        type="button"
-                        key={tpl.name}
-                        onClick={() => {
-                          const form = dialog.current?.querySelector('form') as HTMLFormElement;
-                          if (form) {
-                            (form.elements.namedItem('name') as HTMLInputElement).value = tpl.name;
-                            (form.elements.namedItem('identity') as HTMLInputElement).value = tpl.identity;
-                            (form.elements.namedItem('target') as HTMLInputElement).value = tpl.target;
-                            (form.elements.namedItem('category') as HTMLSelectElement).value = tpl.category;
-                            (form.elements.namedItem('time') as HTMLSelectElement).value = tpl.time;
-                            (form.elements.namedItem('stackAfter') as HTMLInputElement).value = tpl.stackAfter;
-                            (form.elements.namedItem('twoMinuteStarter') as HTMLInputElement).value = tpl.twoMinuteStarter;
-                          }
-                        }}
-                      >
-                        + {tpl.name}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-
+              <h2>{modal.habit ? 'Edit your habit.' : 'Plant an atomic habit.'}</h2>
               <form onSubmit={submit}>
                 <label>
-                  1. What would you like to do?
-                  <input
-                    name="name"
-                    placeholder="e.g. Read 10 pages, Workout, Code"
-                    maxLength={70}
-                    defaultValue={modal.habit?.name}
-                    required
-                    autoFocus
-                  />
+                  Habit Name
+                  <input name="name" placeholder="e.g. Read 10 pages, Gym workout" defaultValue={modal.habit?.name} required autoFocus />
                 </label>
-
                 <label>
-                  2. I am becoming someone who… (Identity)
-                  <input
-                    name="identity"
-                    placeholder="e.g. is a lifelong learner, an athletic builder"
-                    maxLength={100}
-                    defaultValue={modal.habit?.identity}
-                    required
-                  />
+                  Who are you becoming? (Identity)
+                  <input name="identity" placeholder="e.g. a lifelong learner" defaultValue={modal.habit?.identity} required />
                 </label>
-
                 <label>
-                  3. My daily target
-                  <input
-                    name="target"
-                    placeholder="e.g. 10 pages, 30 minutes, 1 problem"
-                    maxLength={70}
-                    defaultValue={modal.habit?.target}
-                    required
-                  />
+                  Daily Target
+                  <input name="target" placeholder="e.g. 10 pages, 30 minutes" defaultValue={modal.habit?.target} required />
                 </label>
-
                 <div className="form-row">
                   <label>
-                    Area of growth
+                    Category
                     <select name="category" defaultValue={modal.habit?.category || 'mind'}>
                       {Object.entries(categoryInfo).map(([k, v]) => (
-                        <option key={k} value={k}>
-                          {v.label}
-                        </option>
+                        <option key={k} value={k}>{v.label}</option>
                       ))}
                     </select>
                   </label>
-
                   <label>
-                    When feels right?
+                    Time of day
                     <select name="time" defaultValue={modal.habit?.time || 'Morning'}>
                       {['Morning', 'Afternoon', 'Evening', 'Anytime'].map((t) => (
                         <option key={t}>{t}</option>
@@ -1824,44 +1691,21 @@ export default function TeamUp() {
                     </select>
                   </label>
                 </div>
-
                 <div className="atomic-helper-box">
                   <label>
-                    <Layers size={14} /> Habit Stacking (Cue)
-                    <input
-                      name="stackAfter"
-                      placeholder="After I [e.g. pour my morning coffee], I will..."
-                      maxLength={80}
-                      defaultValue={modal.habit?.stackAfter}
-                    />
+                    <Layers size={14} /> Habit Stacking (Anchor)
+                    <input name="stackAfter" placeholder="After I [e.g. pour morning coffee], I will..." defaultValue={modal.habit?.stackAfter} />
                   </label>
-
                   <label>
                     <Clock size={14} /> Two-Minute Rule Starter
-                    <input
-                      name="twoMinuteStarter"
-                      placeholder="Make it effortless: e.g. Read just 1 page"
-                      maxLength={80}
-                      defaultValue={modal.habit?.twoMinuteStarter}
-                    />
+                    <input name="twoMinuteStarter" placeholder="Effortless start: e.g. Read just 1 page" defaultValue={modal.habit?.twoMinuteStarter} />
                   </label>
                 </div>
-
-                <p className="form-hint">
-                  <Users size={14} /> Visible to your teammates for shared accountability.
-                </p>
-
                 <button className="button dark full" disabled={busy}>
-                  {busy ? 'Saving…' : modal.habit ? 'Save changes' : 'Plant this habit'}
-                  <ArrowRight size={16} />
+                  {busy ? 'Saving…' : modal.habit ? 'Save changes' : 'Plant this habit'} <ArrowRight size={16} />
                 </button>
-
                 {modal.habit && (
-                  <button
-                    className="danger-link"
-                    type="button"
-                    onClick={() => setModal({ kind: 'delete', habit: modal.habit })}
-                  >
+                  <button className="danger-link" type="button" onClick={() => deleteHabit(modal.habit!)}>
                     Remove this habit
                   </button>
                 )}
@@ -1869,59 +1713,40 @@ export default function TeamUp() {
             </>
           )}
 
-          {/* MODAL: NUDGE TEAMMATE (KEY ACCOUNTABILITY FEATURE) */}
+          {/* MODAL: NUDGE TEAMMATE */}
           {modal?.kind === 'nudge' && (
             <>
-              <div className="modal-symbol sage">
-                <Zap size={25} />
-              </div>
+              <div className="modal-symbol sage"><Zap size={25} /></div>
               <span className="eyebrow">ACCOUNTABILITY PARTNER</span>
               <h2>Nudge {modal.person?.name}</h2>
               <p className="modal-intro">
                 {modal.habit
-                  ? `Give ${modal.person?.name} a gentle reminder to finish "${modal.habit.name}".`
-                  : `Remind ${modal.person?.name} that there’s still time to show up today!`}
+                  ? `Give ${modal.person?.name} a gentle nudge on "${modal.habit.name}".`
+                  : `Remind ${modal.person?.name} to finish today's habits!`}
               </p>
-
               <form onSubmit={submit}>
-                <label>
-                  Quick Nudge Presets:
-                  <div className="nudge-presets">
-                    {[
-                      `⚡ You’ve got this, ${modal.person?.name}! Still plenty of time today!`,
-                      `🔥 Don’t break the streak! Even 2 minutes counts!`,
-                      `🏃‍♂️ Time to show up! Just open the habit and do step one!`,
-                      `🙌 Rooting for you! Let’s crush our goals together today!`,
-                    ].map((msg) => (
-                      <button
-                        type="button"
-                        key={msg}
-                        className="preset-btn"
-                        onClick={() => {
-                          const ta = document.getElementById('nudge-msg') as HTMLTextAreaElement;
-                          if (ta) ta.value = msg;
-                        }}
-                      >
-                        {msg}
-                      </button>
-                    ))}
-                  </div>
-                </label>
-
-                <label>
-                  Your message:
-                  <textarea
-                    id="nudge-msg"
-                    name="message"
-                    maxLength={400}
-                    rows={3}
-                    required
-                    defaultValue={`⚡ You’ve got this, ${modal.person?.name}! Still plenty of time today!`}
-                  />
-                </label>
-
+                <div className="nudge-presets">
+                  {[
+                    `⚡ You’ve got this, ${modal.person?.name}! Still plenty of time today!`,
+                    `🔥 Don’t break that streak! Even 2 minutes counts!`,
+                    `🏃‍♂️ Time to show up! Just open the habit and take step 1!`,
+                  ].map((msg) => (
+                    <button
+                      type="button"
+                      key={msg}
+                      className="preset-btn"
+                      onClick={() => {
+                        const el = document.getElementById('nudge-msg') as HTMLTextAreaElement;
+                        if (el) el.value = msg;
+                      }}
+                    >
+                      {msg}
+                    </button>
+                  ))}
+                </div>
+                <textarea id="nudge-msg" name="message" maxLength={400} rows={3} required defaultValue={`⚡ You’ve got this, ${modal.person?.name}! Still plenty of time today!`} />
                 <button className="button dark full" disabled={busy}>
-                  <Zap size={16} /> Send Nudge to {modal.person?.name}
+                  <Zap size={16} /> Send Nudge
                 </button>
               </form>
             </>
@@ -1930,48 +1755,10 @@ export default function TeamUp() {
           {/* MODAL: CHEER TEAMMATE */}
           {modal?.kind === 'encourage' && (
             <>
-              <div className="modal-symbol peach">
-                <Heart size={25} />
-              </div>
-              <span className="eyebrow">CELEBRATE WINS</span>
+              <div className="modal-symbol peach"><Heart size={25} /></div>
               <h2>Cheer on {modal.person?.name}</h2>
-              <p className="modal-intro">
-                Celebrate their consistency and reinforce their positive identity.
-              </p>
-
               <form onSubmit={submit}>
-                <label>
-                  Your words of cheer:
-                  <textarea
-                    id="cheer-msg"
-                    name="message"
-                    maxLength={400}
-                    rows={3}
-                    required
-                    defaultValue="🙌 Proud of your consistency today! Keep compounding!"
-                  />
-                </label>
-
-                <div className="nudge-presets">
-                  {[
-                    '🙌 Proud of your consistency today! Keep compounding!',
-                    '🔥 That streak is looking unstoppable! Well done!',
-                    '✨ Small habits, massive results. Inspiring work!',
-                  ].map((m) => (
-                    <button
-                      type="button"
-                      key={m}
-                      className="preset-btn"
-                      onClick={() => {
-                        const el = document.getElementById('cheer-msg') as HTMLTextAreaElement;
-                        if (el) el.value = m;
-                      }}
-                    >
-                      {m}
-                    </button>
-                  ))}
-                </div>
-
+                <textarea name="message" maxLength={400} rows={3} required defaultValue="🙌 Proud of your consistency today! Keep compounding!" />
                 <button className="button dark full" disabled={busy}>
                   <Heart size={16} /> Send Cheer
                 </button>
@@ -1979,40 +1766,33 @@ export default function TeamUp() {
             </>
           )}
 
-          {/* MODAL: INVITE TEAMMATE (SUPER POLISHED) */}
+          {/* MODAL: INVITE TEAMMATES */}
           {modal?.kind === 'invite' && (
             <>
-              <div className="modal-symbol lavender">
-                <Users size={25} />
-              </div>
-              <span className="eyebrow">EXPAND YOUR CIRCLE</span>
-              <h2>Invite Your Accountability Partners</h2>
-              <p className="modal-intro">
-                Invite friends, gym buddies, or study partners. When you show up together,
-                habits stick.
-              </p>
-
+              <div className="modal-symbol lavender"><Users size={25} /></div>
+              <span className="eyebrow">INVITE TEAMMATES</span>
+              <h2>Expand your circle</h2>
+              <p className="modal-intro">Share this link with your friends to track habits together.</p>
               <div className="invite-box-card">
-                <label>Shareable Invitation Link</label>
                 <div className="copy-link-row">
-                  <input readOnly value={inviteLink} onFocus={(e) => e.target.select()} />
+                  <input readOnly value={inviteLink || 'Generating your invitation link…'} onFocus={(e) => e.target.select()} />
                   <button
                     className="button dark"
                     type="button"
+                    disabled={!inviteLink}
                     onClick={async () => {
                       try {
                         await navigator.clipboard.writeText(inviteLink);
-                        notify('⚡ Invitation link copied! Send it to your friend.');
+                        notify('⚡ Invitation link copied!');
                       } catch {
-                        notify('Copy the link manually from the box.');
+                        notify('Copy the link from the input.');
                       }
                     }}
                   >
                     <Copy size={16} /> Copy
                   </button>
                 </div>
-
-                <div className="share-buttons-row">
+                {inviteLink && (
                   <a
                     className="button whatsapp-btn"
                     href={`https://api.whatsapp.com/send?text=${encodeURIComponent(
@@ -2023,236 +1803,8 @@ export default function TeamUp() {
                   >
                     <MessageCircle size={16} /> Share on WhatsApp
                   </a>
-                </div>
-
-                <div className="circle-code-pill">
-                  Circle Code: <strong>{data.team.code || 'GROWTH-7X'}</strong>
-                </div>
+                )}
               </div>
-
-              <div className="privacy-note">
-                <ShieldCheck size={18} />
-                <p>
-                  Teammates will see your daily check-in streaks and habits so you can nudge each
-                  other every day.
-                </p>
-              </div>
-            </>
-          )}
-
-          {/* MODAL: PERSON JOURNEY PROFILE */}
-          {modal?.kind === 'person' && modal.person && (
-            <>
-              <div className="person-modal-header">
-                <Avatar person={modal.person} glow />
-                <div>
-                  <h2>{modal.person.name}’s Journey</h2>
-                  <span className="handle-tag">
-                    {modal.person.handle || `@${modal.person.name.toLowerCase()}`}
-                  </span>
-                </div>
-              </div>
-
-              <p className="modal-intro">
-                {personStats(modal.person).n} of {personStats(modal.person).hs.length} habits complete
-                today · {personStats(modal.person).streak}-day best streak 🔥
-              </p>
-
-              <div className="earned-badges">
-                {earned(modal.person).map((b) => (
-                  <span key={b.name} title={b.desc}>
-                    <b.icon size={13} /> {b.name}
-                  </span>
-                ))}
-              </div>
-
-              <div className="profile-habits">
-                {personStats(modal.person).hs.map((h) => {
-                  const meta = categoryInfo[h.category] || categoryInfo.mind;
-                  const Icon = meta.icon;
-                  const isDone = done(h, today);
-                  return (
-                    <div key={h.id} className="profile-habit-item">
-                      <span className={`habit-icon ${meta.color}`}>
-                        <Icon size={18} />
-                      </span>
-                      <div>
-                        <strong>{h.name}</strong>
-                        <small>
-                          {h.target} · Becoming {h.identity}
-                        </small>
-                      </div>
-                      <span className={`tiny-check ${isDone ? 'yes' : ''}`}>
-                        {isDone && <Check size={12} />}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-
-              {modal.person.id !== data.user.id && (
-                <div className="person-modal-actions">
-                  <button
-                    className="button dark full"
-                    onClick={() => setModal({ kind: 'nudge', person: modal.person })}
-                  >
-                    <Zap size={16} /> Nudge {modal.person.name}
-                  </button>
-                  <button
-                    className="button light full"
-                    onClick={() => setModal({ kind: 'encourage', person: modal.person })}
-                  >
-                    <Heart size={16} /> Cheer on
-                  </button>
-                </div>
-              )}
-            </>
-          )}
-
-          {/* MODAL: DELETE CONFIRMATION */}
-          {modal?.kind === 'delete' && (
-            <>
-              <h2>Remove this habit?</h2>
-              <p className="modal-intro">
-                Remove &ldquo;{modal.habit?.name}&rdquo; and its check-in records? This cannot be
-                undone.
-              </p>
-              <button
-                className="button dark full"
-                disabled={busy}
-                onClick={() => deleteHabit(modal.habit!)}
-              >
-                Yes, remove habit
-              </button>
-              <button className="button light full" onClick={() => setModal(null)}>
-                Keep growing
-              </button>
-            </>
-          )}
-
-          {/* MODAL: CREATE OR JOIN CIRCLE */}
-          {(modal?.kind === 'create' || modal?.kind === 'join') && (
-            <>
-              <div className="modal-symbol sage">
-                <Users size={25} />
-              </div>
-              <span className="eyebrow">YOUR NEXT CHAPTER</span>
-              <h2>{modal.kind === 'join' ? 'Find your squad.' : 'Start an Accountability Circle.'}</h2>
-              <p className="modal-intro">
-                {modal.kind === 'join'
-                  ? 'Join your friend’s circle and start compounding habits together.'
-                  : 'Create a private accountability circle for you and your teammates.'}
-              </p>
-
-              {!account && !demo ? (
-                <>
-                  <a
-                    className="button dark full"
-                    href={`/login?return_to=${encodeURIComponent(
-                      joinToken ? '/?invite=' + joinToken : '/?start=1'
-                    )}`}
-                  >
-                    Sign in to continue <ArrowUpRight size={16} />
-                  </a>
-                  <p className="form-hint">Sign in with email to keep habits synced in real-time.</p>
-                </>
-              ) : (
-                <form onSubmit={submit}>
-                  <label>
-                    Your Display Name
-                    <input
-                      name="displayName"
-                      defaultValue={account?.name || data.user.name}
-                      maxLength={40}
-                      required
-                      autoFocus
-                    />
-                  </label>
-
-                  {modal.kind === 'create' && (
-                    <label>
-                      Circle Name
-                      <input
-                        name="name"
-                        placeholder="e.g. 5AM Club, Founder Circle, Gym Bros"
-                        maxLength={60}
-                        required
-                      />
-                    </label>
-                  )}
-
-                  <div className="privacy-note">
-                    <Users size={18} />
-                    <p>
-                      Teammates will be able to view habits and cheer each other on in real-time.
-                    </p>
-                  </div>
-
-                  <button className="button dark full" disabled={busy}>
-                    {busy
-                      ? 'Creating…'
-                      : modal.kind === 'join'
-                      ? 'Join the Circle'
-                      : 'Create My Circle'}
-                    <ArrowRight size={16} />
-                  </button>
-                </form>
-              )}
-            </>
-          )}
-
-          {/* MODAL: LESSON READER */}
-          {modal?.kind === 'lesson' && (
-            <>
-              <div className="modal-symbol sand">
-                <Sprout size={26} />
-              </div>
-              <span className="eyebrow">ATOMIC WISDOM · 2 MIN READ</span>
-              <h2>{modal.title}</h2>
-              <div className="lesson-body">
-                {modal.body?.split('\n\n').map((p) => (
-                  <p key={p}>{p}</p>
-                ))}
-              </div>
-              <button
-                className="button dark full"
-                onClick={() => {
-                  setModal(null);
-                  changeView('Today');
-                }}
-              >
-                Apply this today <ArrowRight size={16} />
-              </button>
-            </>
-          )}
-
-          {/* MODAL: SHARE REFLECTION */}
-          {modal?.kind === 'reflect' && (
-            <>
-              <div className="modal-symbol sand">
-                <PenLine size={25} />
-              </div>
-              <span className="eyebrow">NOTICE YOUR GROWTH</span>
-              <h2>Share a reflection or win</h2>
-              <p className="modal-intro">
-                What felt good today? What did you learn? Inspire your teammates.
-              </p>
-              <form onSubmit={submit}>
-                <label>
-                  Your reflection
-                  <textarea
-                    name="message"
-                    maxLength={400}
-                    rows={4}
-                    placeholder="Today I realized that stacking my habit after coffee made starting so much easier..."
-                    required
-                    autoFocus
-                  />
-                </label>
-                <button className="button dark full" disabled={busy}>
-                  Share reflection with circle <ArrowUpRight size={16} />
-                </button>
-              </form>
             </>
           )}
 
@@ -2260,102 +1812,50 @@ export default function TeamUp() {
           {modal?.kind === 'settings' && (
             <>
               <Avatar person={data.user} />
-              <h2>Your Corner</h2>
+              <h2>{data.user.name}</h2>
               <p className="modal-intro">
-                {data.team.name} · {data.members.length} members
+                Circle: <strong>{currentTeam.name}</strong> · {data.members.length} {data.members.length === 1 ? 'member' : 'members'}
               </p>
-
-              <div className="privacy-note">
-                <Users size={18} />
-                <p>
-                  Your habits and check-ins are visible to teammates for accountability.
-                </p>
-              </div>
-
-              {demo ? (
-                <div className="demo-corner-box">
-                  <p>
-                    You are exploring in demo mode. Create an account to invite real teammates
-                    across different phones and laptops.
-                  </p>
-                  <a className="button dark full" href="/login">
-                    Sign in or Create Free Account <ArrowUpRight size={16} />
-                  </a>
-                </div>
-              ) : (
-                <button
-                  className="button light full"
-                  onClick={async () => {
-                    const r = await fetch('/api/auth', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ action: 'signout' }),
-                    });
-                    if (r.ok) location.assign('/');
-                    else notify('Could not sign out.');
-                  }}
-                >
-                  <LogOut size={16} /> Sign out
-                </button>
-              )}
+              <button
+                className="button light full"
+                onClick={async () => {
+                  const r = await fetch('/api/auth', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: 'signout' }),
+                  });
+                  if (r.ok) location.assign('/');
+                }}
+              >
+                <LogOut size={16} /> Sign out
+              </button>
             </>
           )}
 
-          {/* MODAL: NOTIFICATIONS / ACTIVITY */}
-          {modal?.kind === 'notifications' && (
+          {/* MODAL: LESSON */}
+          {modal?.kind === 'lesson' && (
             <>
-              <span className="eyebrow">CIRCLE UPDATES</span>
-              <h2>Team Nudges & Cheers</h2>
-              <div className="activity-note-list modal-notes">
-                {data.notes.map((note) => {
-                  const author = data.members.find((p) => p.id === note.userId) || data.user;
-                  const to = data.members.find((p) => p.id === note.recipient);
-                  return (
-                    <div className="note" key={note.id}>
-                      <Avatar person={author} small />
-                      <div>
-                        <p>
-                          <strong>{author.name}</strong>
-                          {to && <> cheered on <strong>{to.name}</strong></>}
-                        </p>
-                        <p className="note-body">{note.message}</p>
-                      </div>
-                    </div>
-                  );
-                })}
+              <div className="modal-symbol sand"><Sprout size={26} /></div>
+              <h2>{modal.title}</h2>
+              <div className="lesson-body">
+                {modal.body?.split('\n\n').map((p) => (
+                  <p key={p}>{p}</p>
+                ))}
               </div>
-            </>
-          )}
-
-          {/* MODAL: ABOUT */}
-          {modal?.kind === 'about' && (
-            <>
-              <Brand />
-              <h2>A little better, together.</h2>
-              <p className="modal-intro">
-                Team Up is an accountability habit tracker inspired by James Clear’s Atomic
-                Habits and the Atoms app.
-              </p>
-              <div className="privacy-note">
-                <Heart size={20} />
-                <p>
-                  Built for the younger generation to stay consistent, avoid burnout, and lift each
-                  other up.
-                </p>
-              </div>
+              <button className="button dark full" onClick={() => setModal(null)}>
+                Got it <ArrowRight size={16} />
+              </button>
             </>
           )}
         </div>
       </dialog>
 
-      {/* TOAST NOTIFICATION */}
+      {/* TOAST */}
       {toast && (
         <div className="toast" role="status">
           <CheckCircle2 size={17} />
           <span>{toast}</span>
-          <button aria-label="Dismiss" onClick={() => setToast('')}>
-            <X size={15} />
-          </button>
+          <button onClick={() => setToast('')}><X size={15} /></button>
         </div>
       )}
     </div>
