@@ -42,7 +42,7 @@ export type Note = {
 
 export type State = {
   user: Person;
-  team: { id: string; name: string; code?: string } | null;
+  team: { id: string; name: string; code?: string };
   members: Person[];
   habits: Habit[];
   checkins: Checkin[];
@@ -146,7 +146,7 @@ export const ATOMIC_HABIT_TEMPLATES = [
   },
   {
     name: 'Drink 2.5L water',
-    identity: 'someone who takes care of their health',
+    identity: 'someone who fuels their body with care',
     target: '4 full water bottles',
     category: 'body' as HabitCategory,
     time: 'Anytime' as HabitTime,
@@ -164,17 +164,48 @@ export const ATOMIC_HABIT_TEMPLATES = [
   },
 ];
 
-export function emptyState(user?: Person, teamName?: string): State {
+export function initialUserState(user?: Person | null, teamName?: string): State {
   const defaultUser: Person = user || {
-    id: 'me',
+    id: 'user_main',
     name: 'You',
     color: 'peach',
   };
   return {
     user: defaultUser,
-    team: teamName ? { id: 'team_' + Date.now(), name: teamName, code: 'CIRC-' + Math.random().toString(36).substring(2, 6).toUpperCase() } : null,
-    members: user ? [user] : [],
-    habits: [],
+    team: {
+      id: 'team_main',
+      name: teamName || (user ? `${user.name}’s Squad` : 'Accountability Circle'),
+      code: 'CIRCLE-7X',
+    },
+    members: [defaultUser],
+    habits: user
+      ? []
+      : [
+          {
+            id: 'h_starter_1',
+            userId: defaultUser.id,
+            name: 'Read 10 pages of a book',
+            identity: 'a lifelong learner',
+            target: '10 pages daily',
+            category: 'mind',
+            time: 'Morning',
+            stackAfter: 'After pouring morning coffee',
+            twoMinuteStarter: 'Read just 1 page',
+            created: new Date().toISOString(),
+          },
+          {
+            id: 'h_starter_2',
+            userId: defaultUser.id,
+            name: '20-minute workout or movement',
+            identity: 'someone who takes care of their health',
+            target: '20 mins',
+            category: 'body',
+            time: 'Morning',
+            stackAfter: 'After putting on workout shoes',
+            twoMinuteStarter: 'Do 5 pushups or 30s stretch',
+            created: new Date().toISOString(),
+          },
+        ],
     checkins: [],
     notes: [],
   };

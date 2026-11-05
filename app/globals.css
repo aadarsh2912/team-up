@@ -3116,6 +3116,166 @@ footer {
   font-size: 13px;
 }
 
+/* CLEAN MODAL FORMS & ENFORCED VERTICAL LAYOUTS */
+.clean-modal-form {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 16px !important;
+  width: 100% !important;
+  margin-top: 14px !important;
+}
+
+.form-group {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: stretch !important;
+  gap: 6px !important;
+  width: 100% !important;
+  margin-bottom: 2px !important;
+}
+
+.form-group label {
+  display: block !important;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  color: var(--ink) !important;
+  letter-spacing: -0.01em !important;
+  text-align: left !important;
+}
+
+.form-group input,
+.form-group select,
+.form-group textarea {
+  display: block !important;
+  width: 100% !important;
+  height: 48px !important;
+  padding: 0 14px !important;
+  font-size: 14px !important;
+  font-family: inherit !important;
+  color: var(--ink) !important;
+  background: var(--bg) !important;
+  border: 1.5px solid var(--line) !important;
+  border-radius: 12px !important;
+  box-sizing: border-box !important;
+  transition: all 0.15s ease !important;
+}
+
+.form-group textarea {
+  height: 88px !important;
+  padding: 12px 14px !important;
+  resize: vertical !important;
+}
+
+.form-group input:focus,
+.form-group select:focus,
+.form-group textarea:focus {
+  border-color: var(--accent) !important;
+  background: var(--paper) !important;
+  outline: none !important;
+  box-shadow: 0 0 0 3px var(--accent-glow) !important;
+}
+
+/* Enforce vertical block layout for ANY label and input in modals and setup pages */
+.modal label,
+.setup-form label,
+.clean-modal-form label {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 6px !important;
+  width: 100% !important;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  color: var(--ink) !important;
+  text-align: left !important;
+}
+
+.modal input,
+.modal select,
+.modal textarea,
+.setup-form input,
+.setup-form select,
+.setup-form textarea {
+  display: block !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+/* SIDEBAR ACTIONS & LOGIN BUTTON */
+.sidebar-action-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  margin-top: 14px;
+}
+
+.sidebar-login-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 14px;
+  background: var(--paper-muted);
+  border: 1.5px solid var(--line);
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+  transition: all 0.15s ease;
+  text-decoration: none;
+}
+
+.sidebar-login-btn:hover {
+  background: var(--ink);
+  color: var(--bg);
+  border-color: var(--ink);
+}
+
+.invite-side-secondary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 9px 12px;
+  background: transparent;
+  border: 1.5px dashed var(--line);
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+  transition: all 0.15s ease;
+  cursor: pointer;
+}
+
+.invite-side-secondary:hover {
+  background: var(--paper-muted);
+  color: var(--ink);
+  border-style: solid;
+}
+
+.top-signin-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  border-radius: 20px;
+  background: var(--paper-muted);
+  border: 1.5px solid var(--line);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+  text-decoration: none;
+  transition: all 0.15s ease;
+}
+
+.top-signin-pill:hover {
+  background: var(--ink);
+  color: var(--bg);
+  border-color: var(--ink);
+}
+
 @media (max-width: 820px) {
   .landing-hero h1 {
     font-size: 34px;
