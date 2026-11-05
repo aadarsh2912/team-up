@@ -38,3 +38,4 @@ A calm, intentional daily habit tracking and accountability circle web applicati
    ```bash
    npm run build
    ```
+
